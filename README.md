@@ -41,9 +41,8 @@ Designed for users who want **instant market visibility without opening a browse
 
 ## 🖼 Screenshots
 
-_Add screenshots for better visibility on GitHub_
-
-
+<img width="402" height="649" alt="image" src="https://github.com/user-attachments/assets/c95aa3b9-6909-4aaa-9df7-13206a44c73e" />
+<img width="395" height="661" alt="image" src="https://github.com/user-attachments/assets/5b85c3b7-ac96-4d3b-b64f-e8d5f3cce8d2" />
 
 ---
 
