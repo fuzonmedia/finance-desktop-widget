@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import sys, json, signal, requests, yfinance as yf
+import os, sys, json, signal, requests, yfinance as yf
 from pathlib import Path
+from json import JSONDecodeError
 
 from PyQt5.QtCore import Qt, QTimer, QThread, QObject, pyqtSignal
 from PyQt5.QtWidgets import (
@@ -99,7 +100,30 @@ def menu_stylesheet():
     """
 
 # ================= CONFIG =================
-BASE_DIR = Path.home() / ".config" / "finance_widget"
+def get_base_dir():
+    if sys.platform.startswith("win"):
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "finance_widget"
+    return Path.home() / ".config" / "finance_widget"
+
+
+def get_autostart_file():
+    if sys.platform.startswith("win"):
+        startup = (
+            Path(os.environ["APPDATA"])
+            / "Microsoft"
+            / "Windows"
+            / "Start Menu"
+            / "Programs"
+            / "Startup"
+        )
+        return startup / "finance-widget.cmd"
+    autostart_dir = Path.home() / ".config" / "autostart"
+    return autostart_dir / "finance-widget.desktop"
+
+
+BASE_DIR = get_base_dir()
 BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 SYMBOLS_FILE = BASE_DIR / "symbols.json"
@@ -119,15 +143,24 @@ DEFAULT_SETTINGS = {
 }
 
 # ================= AUTOSTART =================
-AUTOSTART_DIR = Path.home() / ".config" / "autostart"
-AUTOSTART_FILE = AUTOSTART_DIR / "finance-widget.desktop"
+AUTOSTART_FILE = get_autostart_file()
 
 def enable_autostart():
-    AUTOSTART_DIR.mkdir(parents=True, exist_ok=True)
-    AUTOSTART_FILE.write_text(f"""[Desktop Entry]
+    AUTOSTART_FILE.parent.mkdir(parents=True, exist_ok=True)
+    app_path = Path(__file__).resolve()
+
+    if sys.platform.startswith("win"):
+        pythonw = Path(sys.executable).with_name("pythonw.exe")
+        launcher = pythonw if pythonw.exists() else Path(sys.executable)
+        AUTOSTART_FILE.write_text(
+            f'@echo off\r\nstart "" "{launcher}" "{app_path}"\r\n',
+            encoding="utf-8"
+        )
+    else:
+        AUTOSTART_FILE.write_text(f"""[Desktop Entry]
 Type=Application
 Name=Finance Widget
-Exec=python3 {Path(__file__).absolute()}
+Exec={sys.executable} {app_path}
 X-GNOME-Autostart-enabled=true
 """)
 
@@ -145,7 +178,12 @@ def is_autostart_enabled():
 def load_settings():
     if not SETTINGS_FILE.exists():
         SETTINGS_FILE.write_text(json.dumps(DEFAULT_SETTINGS, indent=2))
-    data = json.loads(SETTINGS_FILE.read_text())
+    try:
+        raw = SETTINGS_FILE.read_text(encoding="utf-8-sig").strip()
+        data = json.loads(raw) if raw else {}
+    except (OSError, JSONDecodeError):
+        data = {}
+        SETTINGS_FILE.write_text(json.dumps(DEFAULT_SETTINGS, indent=2), encoding="utf-8")
     merged = DEFAULT_SETTINGS.copy()
     merged.update(data)
     merged["panels"] = {**DEFAULT_SETTINGS["panels"], **data.get("panels", {})}
@@ -175,7 +213,12 @@ DEFAULT_SYMBOLS = {
 def load_symbols():
     if not SYMBOLS_FILE.exists():
         SYMBOLS_FILE.write_text(json.dumps(DEFAULT_SYMBOLS, indent=2))
-    return json.loads(SYMBOLS_FILE.read_text())
+    try:
+        raw = SYMBOLS_FILE.read_text(encoding="utf-8-sig").strip()
+        return json.loads(raw) if raw else DEFAULT_SYMBOLS
+    except (OSError, JSONDecodeError):
+        SYMBOLS_FILE.write_text(json.dumps(DEFAULT_SYMBOLS, indent=2), encoding="utf-8")
+        return DEFAULT_SYMBOLS
 
 def save_symbols(s):
     SYMBOLS_FILE.write_text(json.dumps(s, indent=2))
@@ -841,8 +884,11 @@ class FinanceWidget(QWidget):
 
 # ================= ENTRY =================
 def main():
+    if sys.platform.startswith("win"):
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
     app = QApplication(sys.argv)
-    signal.signal(signal.SIGINT, lambda *_: QApplication.quit())
+    if not sys.platform.startswith("win"):
+        signal.signal(signal.SIGINT, lambda *_: QApplication.quit())
     w = FinanceWidget()
     w.show()
     sys.exit(app.exec_())
