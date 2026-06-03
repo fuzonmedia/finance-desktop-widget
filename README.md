@@ -185,6 +185,7 @@ All user data is stored locally.
 - UI timers are separated from data fetch logic
 - Thread-safe UI updates use Qt signals
 - Settings loading is tolerant of empty or malformed local config files
+- Indian stock and ETF symbols can fall back to Yahoo Finance with the `.NS` suffix when NSE stock quote requests are blocked
 
 ---
 

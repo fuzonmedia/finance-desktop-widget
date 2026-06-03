@@ -224,11 +224,18 @@ def save_symbols(s):
     SYMBOLS_FILE.write_text(json.dumps(s, indent=2))
 
 def infer_provider(symbol, name):
-    if name.startswith("NIFTY"):
+    symbol = symbol.strip()
+    name = name.strip()
+    if " " in symbol and name.startswith("NIFTY"):
         return "nse_index"
     if symbol.isupper() and "." not in symbol and "=" not in symbol:
         return "nse_stock"
     return "yahoo"
+
+
+def india_yahoo_symbol(sym):
+    sym = sym.strip()
+    return sym if "." in sym or "=" in sym else f"{sym}.NS"
 
 # ================= DATA =================
 NSE = requests.Session()
@@ -239,24 +246,36 @@ NSE.headers.update({
 })
 
 def fetch_nse_index(name):
-    NSE.get("https://www.nseindia.com", timeout=8)
-    r = NSE.get("https://www.nseindia.com/api/allIndices", timeout=8)
-    for i in r.json().get("data", []):
-        if i.get("index") == name:
-            return (
-                float(i.get("last", 0)),
-                float(i.get("change") or i.get("variation") or 0),
-                float(i.get("percentChange", 0))
-            )
+    name = name.strip()
+    try:
+        NSE.get("https://www.nseindia.com", timeout=8)
+        r = NSE.get("https://www.nseindia.com/api/allIndices", timeout=8)
+        for i in r.json().get("data", []):
+            if i.get("index") == name:
+                return (
+                    float(i.get("last", 0)),
+                    float(i.get("change") or i.get("variation") or 0),
+                    float(i.get("percentChange", 0))
+                )
+    except Exception as e:
+        log("NSE INDEX FALLBACK:", name, e)
+
+    if " " not in name:
+        return fetch_yahoo(india_yahoo_symbol(name))
     return None, None, None
 
 def fetch_nse_stock(sym):
-    NSE.get("https://www.nseindia.com", timeout=8)
-    r = NSE.get(f"https://www.nseindia.com/api/quote-equity?symbol={sym}", timeout=8)
-    p = r.json().get("priceInfo")
-    if not p:
-        return None, None, None
-    return float(p["lastPrice"]), float(p["change"]), float(p["pChange"])
+    sym = sym.strip()
+    try:
+        NSE.get("https://www.nseindia.com", timeout=8)
+        r = NSE.get(f"https://www.nseindia.com/api/quote-equity?symbol={sym}", timeout=8)
+        p = r.json().get("priceInfo")
+        if p:
+            return float(p["lastPrice"]), float(p["change"]), float(p["pChange"])
+    except Exception as e:
+        log("NSE STOCK FALLBACK:", sym, e)
+
+    return fetch_yahoo(india_yahoo_symbol(sym))
 
 def fetch_yahoo(sym):
     t = yf.Ticker(sym)
