@@ -3,7 +3,7 @@ import os, sys, json, signal, requests, yfinance as yf
 from pathlib import Path
 from json import JSONDecodeError
 
-from PyQt5.QtCore import Qt, QTimer, QThread, QObject, pyqtSignal
+from PyQt5.QtCore import Qt, QTimer, QThread, QObject, pyqtSignal, QPoint, QRect
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
     QFrame, QMenu, QDialog, QLineEdit,
@@ -198,6 +198,31 @@ def save_settings(w, panels, autostart):
         "autostart": autostart,
         "refresh_interval": w.settings.get("refresh_interval", 30)
     }, indent=2))
+
+
+def clamp_widget_geometry(x, y, width, height):
+    app = QApplication.instance()
+    if not app:
+        return x, y, width, height
+
+    point = QPoint(x, y)
+    screen = app.screenAt(point) or app.primaryScreen()
+    if not screen:
+        return x, y, width, height
+
+    available = screen.availableGeometry()
+    min_width = 300
+    min_height = 200
+
+    width = max(min_width, min(width, available.width()))
+    height = max(min_height, min(height, available.height()))
+
+    max_x = available.x() + max(0, available.width() - width)
+    max_y = available.y() + max(0, available.height() - height)
+    x = min(max(x, available.x()), max_x)
+    y = min(max(y, available.y()), max_y)
+
+    return x, y, width, height
 
 # ================= SYMBOLS =================
 DEFAULT_SYMBOLS = {
@@ -672,10 +697,13 @@ class FinanceWidget(QWidget):
 
         self.worker.fetch(self.symbols)
 
-        self.setGeometry(
-            self.settings["x"], self.settings["y"],
-            self.settings["width"], self.settings["height"]
+        x, y, width, height = clamp_widget_geometry(
+            self.settings["x"],
+            self.settings["y"],
+            self.settings["width"],
+            self.settings["height"]
         )
+        self.setGeometry(x, y, width, height)
 
         self.apply_theme()
         self.apply_panel_visibility()
@@ -686,9 +714,11 @@ class FinanceWidget(QWidget):
 
         # Build tray menu dynamically when opened
         tray_menu = QMenu(self)
+        tray_menu.setStyleSheet(menu_stylesheet())
 
         def rebuild_tray_menu():
             tray_menu.clear()
+            tray_menu.setStyleSheet(menu_stylesheet())
 
             # Autostart toggle (tray-only)
             autostart_action = QAction("Run on Startup", self)

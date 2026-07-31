@@ -175,6 +175,7 @@ All user data is stored locally.
 - Linux autostart uses `~/.config/autostart/finance-widget.desktop`
 - Windows autostart uses `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\finance-widget.cmd`
 - The tray menu can enable or disable startup on both platforms
+- On Windows, saved window geometry is clamped back onto the visible screen when the display resolution or orientation changes
 
 ---
 
@@ -186,6 +187,7 @@ All user data is stored locally.
 - Thread-safe UI updates use Qt signals
 - Settings loading is tolerant of empty or malformed local config files
 - Indian stock and ETF symbols can fall back to Yahoo Finance with the `.NS` suffix when NSE stock quote requests are blocked
+- The tray menu is explicitly styled so dark Windows taskbars do not render unreadable black-on-black menu text
 
 ---
 
